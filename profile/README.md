@@ -23,9 +23,3 @@ We're actively developing a comprehensive suite of PayloadCMS plugins:
 - **[@xtr-dev/payload-ecommerce](https://github.com/xtr-dev/payload-ecommerce)** - Full-featured e-commerce solution
 - **[@xtr-dev/payload-ecommerce-plus](https://github.com/xtr-dev/payload-ecommerce-plus)** - Premium features with subscriptions and booking
 
-## 🌈 How to Contribute
-
-We welcome contributions from the community! Here's how you can get involved:
-
-### 🐛 Report Issues
-Found a bug or have a feature request? Open an issue in the relevant repository.
