@@ -1,6 +1,4 @@
-# Hi there 👋
-
-## 🙋‍♀️ What is xtr.dev?
+# Hi there 🚣🏼‍♂️⭐
 
 **xtr.dev** is building the essential plugin ecosystem for PayloadCMS developers. We create open-source plugins that solve real development needs, making your PayloadCMS projects faster and more powerful.
 
