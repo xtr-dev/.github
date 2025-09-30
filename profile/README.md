@@ -1,10 +1,7 @@
-# Hi there 🚣🏼‍♂️⭐
+**xtr.dev** is building essential plugins for PayloadCMS. 
+We create open-source plugins that solve real development needs, making your PayloadCMS projects faster and more powerful.
 
-**xtr.dev** is building the essential plugin ecosystem for PayloadCMS developers. We create open-source plugins that solve real development needs, making your PayloadCMS projects faster and more powerful.
-
-Our mission is simple: **Build the tools we wish we had when developing with PayloadCMS.**
-
-## 🚀 Our Plugin Collection
+## Our Plugins
 
 We're actively developing a comprehensive suite of PayloadCMS plugins:
 
