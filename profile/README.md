@@ -25,4 +25,4 @@ We're actively developing a comprehensive suite of PayloadCMS plugins:
 
 - [rondevu-server](https://github.com/xtr-dev/rondevu-server) - HTTP signaling server
 - [rondevu-client](https://github.com/xtr-dev/rondevu-client) - TypeScript client library
-- [rondevu-demo](https://github.com/xtr-dev/rondevu-demo) - Interactive demo
+- [rondevu-demo](https://github.com/xtr-dev/rondevu-demo) - Interactive demo (live: https://ronde.vu)
