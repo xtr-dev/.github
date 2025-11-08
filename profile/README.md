@@ -1,7 +1,7 @@
 **xtr.dev** is building essential plugins for PayloadCMS. 
 We create open-source plugins that solve real development needs, making your PayloadCMS projects faster and more powerful.
 
-## Our Plugins
+## PayloadCMS Plugins
 
 We're actively developing a comprehensive suite of PayloadCMS plugins:
 
@@ -18,3 +18,11 @@ We're actively developing a comprehensive suite of PayloadCMS plugins:
 - **[@xtr-dev/payload-ecommerce](https://github.com/xtr-dev/payload-ecommerce)** - Full-featured e-commerce solution
 - **[@xtr-dev/payload-ecommerce-plus](https://github.com/xtr-dev/payload-ecommerce-plus)** - Premium features with subscriptions and booking
 
+
+## Rondevu: Simple WebRTC peer signaling and discovery
+
+🎯 Meet peers by topic, by peer ID, or by connection ID.
+
+- [rondevu-server](https://github.com/xtr-dev/rondevu-server) - HTTP signaling server
+- [rondevu-client](https://github.com/xtr-dev/rondevu-client) - TypeScript client library
+- [rondevu-demo](https://github.com/xtr-dev/rondevu-demo) - Interactive demo
