@@ -1,4 +1,4 @@
-**xtr.dev** is building essential plugins for PayloadCMS and tools for peer-to-peer connectivity.
+**xtr.dev** is building essential plugins for PayloadCMS and tools for peer-to-peer connectivity.  
 We create open-source packages that solve real development needs.
 
 ## 🔌 PayloadCMS Plugins
