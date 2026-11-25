@@ -97,15 +97,18 @@ jobs:
           [ -n "$RELEASE_AS" ] && args+=(--release-as "$RELEASE_AS")
           [ -n "$PREID" ] && args+=(--preid "$PREID")
 
+          # The JSON result includes every scanned commit and can exceed the
+          # per-variable size limit, so it goes through a file, not the environment.
+          RESULT_FILE="$RUNNER_TEMP/release-result.json"
           if [ "$DRY_RUN" = "true" ]; then
             npx --yes "$CHANGELOG" preview "${args[@]}"
-            OUT=$(npx --yes "$CHANGELOG" preview --json "${args[@]}")
+            npx --yes "$CHANGELOG" preview --json "${args[@]}" > "$RESULT_FILE"
           else
             # Commit and tag locally only; nothing leaves the runner until npm has the package.
-            OUT=$(npx --yes "$CHANGELOG" release --tag --json "${args[@]}")
+            npx --yes "$CHANGELOG" release --tag --json "${args[@]}" > "$RESULT_FILE"
           fi
-          RESULT="$OUT" node -e '
-            const r = JSON.parse(process.env.RESULT)
+          RESULT_FILE="$RESULT_FILE" node -e '
+            const r = JSON.parse(require("fs").readFileSync(process.env.RESULT_FILE, "utf8"))
             const fs = require("fs")
             fs.appendFileSync(process.env.GITHUB_OUTPUT,
               `released=${r.released}\nversion=${r.version}\nprevious=${r.previousVersion}\ntag=${r.git?.tag ?? ""}\n`)
