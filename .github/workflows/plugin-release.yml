@@ -1,0 +1,172 @@
+# Shared release pipeline for the xtr-dev npm packages.
+#
+# Called from each package's own `.github/workflows/release.yml` (a manual
+# "Run workflow" button). It:
+#   1. installs, runs the package's checks and builds,
+#   2. lets @xtr-dev/changelog derive the next version from the conventional
+#      commits since the last tag, write CHANGELOG.md / package.json, and create
+#      the release commit + tag LOCALLY,
+#   3. publishes to npm with OIDC trusted publishing (no NPM_TOKEN) and provenance,
+#   4. only then pushes the release commit and tag, and creates a GitHub Release.
+#
+# Publishing before pushing means a failed publish leaves nothing behind on
+# GitHub: the next run computes the same release again instead of tripping over
+# a tag for a version npm never received.
+#
+# npm trusted publisher settings for each package: organization `xtr-dev`, the
+# package's repository, workflow filename `release.yml` (the caller), no environment.
+name: Plugin release
+
+on:
+  workflow_call:
+    inputs:
+      dry-run:
+        description: Compute and print the release, build and pack, but publish and push nothing.
+        type: boolean
+        default: false
+      release-as:
+        description: Release exactly this version instead of the one derived from commits.
+        type: string
+        default: ''
+      preid:
+        description: Cut a pre-release with this identifier (e.g. beta), published under the `next` dist-tag.
+        type: string
+        default: ''
+      check:
+        description: Shell commands that must pass before releasing (run with bash -euo pipefail).
+        type: string
+        default: |
+          pnpm lint
+          pnpm test
+      node-version:
+        type: string
+        default: '22'
+      changelog-version:
+        description: Version of @xtr-dev/changelog to run.
+        type: string
+        default: '0.0.27'
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: release-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Full history and tags: the changelog tool walks back to the last tag.
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+
+      # Trusted publishing needs npm >= 11.5.1; the npm bundled with Node 22 is older.
+      - run: npm install -g npm@^11.5.1
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Checks
+        env:
+          CHECK: ${{ inputs.check }}
+        run: bash -euo pipefail -c "$CHECK"
+
+      - name: Compute release
+        id: release
+        env:
+          DRY_RUN: ${{ inputs.dry-run }}
+          RELEASE_AS: ${{ inputs.release-as }}
+          PREID: ${{ inputs.preid }}
+          CHANGELOG: '@xtr-dev/changelog@${{ inputs.changelog-version }}'
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          args=()
+          [ -n "$RELEASE_AS" ] && args+=(--release-as "$RELEASE_AS")
+          [ -n "$PREID" ] && args+=(--preid "$PREID")
+
+          if [ "$DRY_RUN" = "true" ]; then
+            npx --yes "$CHANGELOG" preview "${args[@]}"
+            OUT=$(npx --yes "$CHANGELOG" preview --json "${args[@]}")
+          else
+            # Commit and tag locally only; nothing leaves the runner until npm has the package.
+            OUT=$(npx --yes "$CHANGELOG" release --tag --json "${args[@]}")
+          fi
+          RESULT="$OUT" node -e '
+            const r = JSON.parse(process.env.RESULT)
+            const fs = require("fs")
+            fs.appendFileSync(process.env.GITHUB_OUTPUT,
+              `released=${r.released}\nversion=${r.version}\nprevious=${r.previousVersion}\ntag=${r.git?.tag ?? ""}\n`)
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, r.released
+              ? `### ${process.env.DRY_RUN === "true" ? "Would release" : "Releasing"} v${r.version} (from v${r.previousVersion})\n`
+              : `### Nothing to release\nNo releasable conventional commits since v${r.previousVersion}. Use \`release-as\` to force a version.\n`)
+          '
+
+      # Build after the version bump so anything that embeds the version sees the new one.
+      - name: Build and pack
+        if: steps.release.outputs.released == 'true'
+        id: pack
+        run: |
+          set -euo pipefail
+          pnpm build
+          # pnpm pack applies publishConfig overrides (exports/main/types) that a
+          # plain `npm publish` of the directory would ignore.
+          mkdir -p "$RUNNER_TEMP/pack"
+          pnpm pack --pack-destination "$RUNNER_TEMP/pack"
+          TARBALL=$(ls "$RUNNER_TEMP"/pack/*.tgz)
+          tar -tzf "$TARBALL" | sed 's/^/  /'
+          echo "tarball=$TARBALL" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to npm
+        if: steps.release.outputs.released == 'true' && !inputs.dry-run
+        env:
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+          PREID: ${{ inputs.preid }}
+        run: |
+          set -euo pipefail
+          tag=latest
+          [ -n "$PREID" ] && tag=next
+          npm publish "$TARBALL" --provenance --access public --tag "$tag"
+
+      - name: Push release commit and tag
+        if: steps.release.outputs.released == 'true' && !inputs.dry-run
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if ! git push --atomic --follow-tags origin "HEAD:$BRANCH"; then
+            # Someone pushed to the branch while this run was going. Merge rather
+            # than rebase so the tag stays on the commit that was actually built
+            # and remains reachable from the branch (the changelog tool needs that
+            # to find the previous version next time).
+            git fetch origin "$BRANCH"
+            git merge --no-edit -m "Merge release into $BRANCH [skip ci]" "origin/$BRANCH"
+            git push --atomic --follow-tags origin "HEAD:$BRANCH"
+          fi
+
+      - name: Create GitHub Release
+        if: steps.release.outputs.released == 'true' && !inputs.dry-run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+          PREID: ${{ inputs.preid }}
+          CHANGELOG: '@xtr-dev/changelog@${{ inputs.changelog-version }}'
+        run: |
+          set -euo pipefail
+          npx --yes "$CHANGELOG" notes "$VERSION" > "$RUNNER_TEMP/notes.md"
+          flags=()
+          [ -n "$PREID" ] && flags+=(--prerelease)
+          gh release create "$TAG" --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md" "${flags[@]}"

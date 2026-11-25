@@ -1,0 +1,46 @@
+# Requires pull request titles to be conventional commits.
+#
+# The packages squash-merge with the PR title as the commit subject, and the
+# release pipeline (@xtr-dev/changelog) derives versions and CHANGELOG.md from
+# those subjects. A title that does not parse would silently drop the change
+# from the next release, so it fails here instead.
+name: PR title
+
+on:
+  workflow_call:
+    inputs:
+      types:
+        description: Space-separated list of allowed commit types.
+        type: string
+        default: feat fix perf refactor revert security docs style test build ci chore a11y i18n deps
+
+permissions: {}
+
+jobs:
+  conventional-title:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          TYPES: ${{ inputs.types }}
+        run: |
+          set -euo pipefail
+          alternatives=$(printf '%s' "$TYPES" | tr -s ' ' '|')
+          pattern="^(${alternatives})(\([a-z0-9._/-]+\))?!?: [^ ].*"
+          if printf '%s' "$TITLE" | grep -Eq "$pattern"; then
+            echo "OK: $TITLE"
+            exit 0
+          fi
+          {
+            echo "### PR title is not a conventional commit"
+            echo ""
+            echo "Got: \`$TITLE\`"
+            echo ""
+            echo "Expected \`type(scope): description\`, e.g. \`fix(api): handle empty input\`."
+            echo "Allowed types: \`$TYPES\`. Add \`!\` after the type/scope for a breaking change."
+            echo ""
+            echo "feat → minor release, fix/perf/refactor/revert/security → patch; the rest do not release on their own."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::error::PR title must look like 'type(scope): description' (types: $TYPES)"
+          exit 1
